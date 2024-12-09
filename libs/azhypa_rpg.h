@@ -1,9 +1,6 @@
 #ifndef AZHYPA_RPG_H
 #define AZHYPA_RPG_H
 
-#define ROCK_COUNT 15
-#define ZOMBIE_COUNT 10
-
 #include<stdbool.h>
 
 void start_azhypa_rpg();
@@ -19,7 +16,7 @@ void move_alive(int screeny, int screenx, char screen[screeny][screenx], int x, 
 void spawn_zombie(int screeny, int screenx, char screen[screeny][screenx], const int count);
 void initialization_screen();
 void attack(int x, int y, int screeny, int screenx, char screen[screeny][screenx]);
-void save_game(const char *filename, const int screeny, const int screenx, char map[screeny][screenx], int lvl, int mapcount);
-void load_game(const char *filename, int *screeny, int *screenx, char map[*(screeny)][*(screenx)], int *lvl, int *mapcount);
+void save_game(const char *filename, const int screeny, const int screenx, char map[screeny][screenx], int lvl, int mapcount, int x, int y);
+void load_game(const char *filename, int *screeny, int *screenx, char map[*(screeny)][*(screenx)], int *lvl, int *mapcount, int *x, int *y);
 
 #endif

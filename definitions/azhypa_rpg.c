@@ -5,7 +5,26 @@
 #include <stdio.h>
 #include<string.h>
 
-void load_game(const char *filename, int *screeny, int *screenx, char map[*screeny][*screenx], int *lvl, int *mapcount) {
+#define ROCK_COUNT 15
+#define ZOMBIE_COUNT 10
+
+void start_azhypa_rpg();
+void print_button(int screeny, int screenx);
+void random_spawn_rock(const int screeny, const int screenx, char map[screeny][screenx], const int count);
+void initialize_map(const int screen_max_y, const int screen_max_x, char map[screen_max_y][screen_max_x], const int rand_rock);
+void print_map(const int screeny, const int screenx, char map[screeny][screenx]);
+void cheatcode(int screeny, int screenx, char map[screeny][screenx], int *lvl, int *mapcount, bool *is_win);
+bool is_screen_correct(int screeny, int screenx);
+void print_menu(int screeny, int screenx);
+void spawn_fly(int screeny, int screenx, char screen[screeny][screenx]);
+void move_alive(int screeny, int screenx, char screen[screeny][screenx], int x, int y);
+void spawn_zombie(int screeny, int screenx, char screen[screeny][screenx], const int count);
+void initialization_screen();
+void attack(int x, int y, int screeny, int screenx, char screen[screeny][screenx]);
+void save_game(const char *filename, const int screeny, const int screenx, char map[screeny][screenx], int lvl, int mapcount, int x, int y);
+void load_game(const char *filename, int *screeny, int *screenx, char map[*(screeny)][*(screenx)], int *lvl, int *mapcount, int *x, int *y);
+
+void load_game(const char *filename, int *screeny, int *screenx, char map[*screeny][*screenx], int *lvl, int *mapcount, int *x, int *y) {
     FILE *file = fopen(filename, "r");
     if (!file) {
         erase();
@@ -15,7 +34,8 @@ void load_game(const char *filename, int *screeny, int *screenx, char map[*scree
         clear();
         return;
     }
-
+    int real_x  = *screenx;
+    int real_y = *screeny;
     char line[256];
     int temp_screeny = 0, temp_screenx = 0;
 
@@ -24,6 +44,10 @@ void load_game(const char *filename, int *screeny, int *screenx, char map[*scree
             sscanf(line, "LEVEL: %d", lvl);
         } else if (strncmp(line, "MAP:", 4) == 0) {
             sscanf(line, "MAP: %d", mapcount);
+        }else if (strncmp(line, "PLAYER_X:", 9) == 0) {
+            sscanf(line, "PLAYER_X: %d", x);  
+        } else if (strncmp(line, "PLAYER_Y:", 9) == 0) {
+            sscanf(line, "PLAYER_Y: %d", y);  
         } else if (strncmp(line, "MAX_Y:", 6) == 0) {
             sscanf(line, "MAX_Y: %d", &temp_screeny);
         } else if (strncmp(line, "MAX_X:", 6) == 0) {
@@ -37,12 +61,17 @@ void load_game(const char *filename, int *screeny, int *screenx, char map[*scree
             }
         }
     }
-
     fclose(file);
-
-    *screeny = temp_screeny;
-    *screenx = temp_screenx;
-
+    if (*screenx != temp_screenx || *screeny != temp_screeny) {
+        erase();
+        mvprintw(real_y / 2, real_x / 2 - 10, "ERROR: Invalid screen size!");
+        mvprintw(real_y / 2 + 1, real_x / 2 - 15, "Expected: %dx%d", temp_screenx, temp_screeny);
+        mvprintw(real_y / 2 + 2, real_x / 2 - 15, "Press any key to exit.");
+        refresh();
+        getch();
+        endwin();
+        exit(1);
+    }
     erase();
     mvprintw(*screeny / 2, *screenx / 2 - 5, "GAME LOADED");
     refresh();
@@ -51,12 +80,12 @@ void load_game(const char *filename, int *screeny, int *screenx, char map[*scree
 }
 
 
-void save_game(const char *filename, const int screeny, const int screenx, char map[screeny][screenx], int lvl, int mapcount) {
+
+void save_game(const char *filename, const int screeny, const int screenx, char map[screeny][screenx], int lvl, int mapcount, int x, int y) {
     FILE *file = fopen(filename, "w");
-    if (!file) 
-    {
+    if (!file) {
         erase();
-        mvprintw(screeny/2, screenx/2-10, "ERROR SAVING");
+        mvprintw(screeny / 2, screenx / 2 - 10, "ERROR SAVING");
         refresh();
         napms(1000);
         clear();
@@ -68,11 +97,15 @@ void save_game(const char *filename, const int screeny, const int screenx, char 
 
     fprintf(file, "LEVEL: %d\n", lvl);
     fprintf(file, "MAP: %d\n", mapcount);
+    fprintf(file, "PLAYER_X: %d\n", x);
+    fprintf(file, "PLAYER_Y: %d\n", y);
     fprintf(file, "MAX_Y: %d\n", screeny);
     fprintf(file, "MAX_X: %d\n", screenx);
     fprintf(file, "MAP_DATA:\n");
-    for (int i = 0; i < screeny; i++) {
-        for (int j = 0; j < screenx; j++) {
+    for (int i = 0; i < screeny; i++) 
+    {
+        for (int j = 0; j < screenx; j++)
+        {
             fputc(map[i][j], file);
         }
         fputc('\n', file);
@@ -80,11 +113,12 @@ void save_game(const char *filename, const int screeny, const int screenx, char 
     fprintf(file, "Game saved at: %s", time_now);
     fclose(file);
     erase();
-    mvprintw(screeny/2, screenx/2-5, "GAME IS SAVED");
+    mvprintw(screeny / 2, screenx / 2 - 5, "GAME IS SAVED");
     refresh();
     napms(1000);
     print_map(screeny, screenx, map);
 }
+
 
 void spawn_zombie(int screeny, int screenx, char screen[screeny][screenx], const int count)
 {
@@ -397,9 +431,10 @@ void print_menu(int screeny, int screenx)
     attron(COLOR_PAIR(4));
     mvprintw(y,x,"SAVE - 'S'\t\tLOAD - 'D'");
     mvprintw(y+2,x,"CHEATCODE - '`'*");
-    mvprintw(y+4,x, "Code:\t 'reset' - generate new map");
-    mvprintw(y+5,x, "\t\t 'lvlup' - You increase your lvl by 1");
-    mvprintw(y+6,x, "\t\t 'restart' - restart game");
+    mvprintw(y+4,x, "Code:'reset' - generate new map");
+    mvprintw(y+5,x, "\t 'lvlup' - You increase your lvl by 1");
+    mvprintw(y+6,x, "\t 'restart' - restart game");
+    mvprintw(y+7,x, "\t 'ggwp' - instant victory");
     attroff(COLOR_PAIR(4));
     getch();
     erase();
@@ -450,7 +485,6 @@ void start_azhypa_rpg()
     print_map(screeny, screenx, map);
     do 
     {
-        if(map[y][x]=='@') break;
         time++;
         if(time==100) time = 0;
 
@@ -458,6 +492,18 @@ void start_azhypa_rpg()
         print_interface(screeny, screenx, y, x, lvl, mapcount);
         if(time%20==0) { spawn_fly(screeny, screenx, map); monstercount++; }
         if(monstercount>0) { move_alive(screeny, screenx, map, x, y); print_map(screeny, screenx, map); }
+        if(map[y][x]=='@')
+        {
+            map[y][x] = ' ';
+            attron(COLOR_PAIR(1));
+            mvaddch(y, x, '.');
+            attroff(COLOR_PAIR(1));
+            refresh();
+            napms(500);
+            mvaddch(y, x, ' ');
+            refresh();
+            break;
+        }
         attron(COLOR_PAIR(2));
         mvaddch(y, x, symbol); 
         attroff(COLOR_PAIR(2));
@@ -465,7 +511,7 @@ void start_azhypa_rpg()
 
         button = getch();
 
-        mvaddch(y,x,' ');
+        mvaddch(y,x, map[y][x]);
 
         if (button == KEY_RIGHT && map[y][x + 1] != '#') x++;
         else if (button == KEY_LEFT && map[y][x - 1] != '#') x--;
@@ -474,8 +520,20 @@ void start_azhypa_rpg()
         else if(button == ' ') attack(x,y,screeny,screenx, map);
         else if (button == '`') cheatcode(screeny, screenx, map, &lvl, &mapcount, &is_win);
         else if(button=='u'||button=='U') { print_menu(screeny,screenx); print_map(screeny,screenx, map); }
-        else if(button == 's' || button == 'S') save_game("log.txt", screeny, screenx, map, lvl, mapcount);
-        else if(button=='d' || button=='D') { load_game("log.txt", &screeny, &screenx, map, &lvl, &mapcount); print_map(screeny, screenx, map); }
+        else if(button == 's' || button == 'S') save_game("log.txt", screeny, screenx, map, lvl, mapcount, x, y);
+        else if(button=='d' || button=='D') { load_game("log.txt", &screeny, &screenx, map, &lvl, &mapcount, &x, &y); print_map(screeny, screenx, map); }
+
+        if (map[y][x] == '@') {
+        map[y][x] = ' ';
+        attron(COLOR_PAIR(1));
+        mvaddch(y, x, '.');
+        attroff(COLOR_PAIR(1));
+        refresh();
+        napms(500);
+        mvaddch(y, x, ' ');
+        refresh();
+        break;
+    }
 
         if(lvl>5) 
         { 
